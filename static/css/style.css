@@ -13,21 +13,33 @@ main.container-fluid {
 }
 
 .video-container {
-    position: relative;
+    /* Cho phép khung này lấp đầy không gian trống còn lại trong card */
+    flex-grow: 1; 
+    
+    /* Quan trọng: Ngăn chặn lỗi co giãn của flexbox */
+    min-height: 0; 
+
+    /* Sử dụng flexbox để căn giữa video một cách hoàn hảo */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
     width: 100%;
-    /* padding-top: 75%; Bỏ tỷ lệ cứng để nó co giãn */
     overflow: hidden;
-    flex-grow: 1; /* Cho phép khung video co giãn */
+    background-color: #000;
+    border-radius: .375rem;
+    margin-bottom: .5rem; 
 }
 
 #video-feed {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover; /* Đổi thành cover để lấp đầy khung */
-    cursor: default;
+    /* Để video tự điều chỉnh kích thước bên trong khung chứa */
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 100%;
+
+    /* Giữ đúng tỷ lệ 3:4 của video mà không bị méo hoặc cắt */
+    object-fit: contain; 
 }
 
 .target-card {

@@ -31,7 +31,7 @@
                     <div class="card-body p-2 d-flex flex-column">
                         <!-- Khung video -->
                         <div class="video-container bg-black rounded mb-2">
-                            <img id="video-feed" src="https://placehold.co/800x600/000000/FFF?text=Đang chờ kết nối..." alt="Video Feed">
+                            <img id="video-feed" src="{{ url_for('pi_bp.video_feed') }}" alt="Video Feed">
                         </div>
                         <!-- Bảng điều khiển -->
                         <div class="controls d-flex align-items-center gap-3 p-2 bg-dark-subtle rounded">
