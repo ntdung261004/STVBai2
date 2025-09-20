@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="vi" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Huấn Luyện Bài 2 STV-380</title>
+    <!-- Bootstrap 5 CSS (cần tải về để chạy offline) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <!-- Sửa đổi: Thêm các class để layout co giãn theo chiều cao -->
+    <main class="container-fluid p-3 d-flex flex-column">
+        <!-- TIÊU ĐỀ CHÍNH -->
+        <header class="text-center mb-3 pb-3 border-bottom border-secondary flex-shrink-0">
+            <h1 class="display-6 fw-bold">
+                <i class="fa-solid fa-crosshairs me-2"></i>
+                Huấn Luyện bài 2 STV-380 ứng dụng công nghệ AI
+            </h1>
+        </header>
+
+        <!-- Sửa đổi: Thêm class flex-grow-1 để hàng này chiếm hết không gian còn lại -->
+        <div class="row g-3 flex-grow-1">
+            <!-- CỘT TRÁI: LIVESTREAM & ĐIỀU KHIỂN -->
+            <div class="col-lg-7 d-flex flex-column">
+                <div class="card h-100 shadow-sm d-flex flex-column">
+                    <div class="card-header fw-bold">Livestream & Điều khiển</div>
+                    <div class="card-body p-2 d-flex flex-column">
+                        <!-- Khung video -->
+                        <div class="video-container bg-black rounded mb-2">
+                            <img id="video-feed" src="https://placehold.co/800x600/000000/FFF?text=Đang chờ kết nối..." alt="Video Feed">
+                        </div>
+                        <!-- Bảng điều khiển -->
+                        <div class="controls d-flex align-items-center gap-3 p-2 bg-dark-subtle rounded">
+                            <button id="calibrate-btn" class="btn btn-warning"><i class="fa-solid fa-crosshairs me-2"></i>Hiệu chỉnh tâm</button>
+                            <div class="d-flex align-items-center flex-grow-1">
+                                <label for="zoom-slider" class="form-label me-2 mb-0">Zoom:</label>
+                                <input type="range" class="form-range" id="zoom-slider" min="1" max="5" step="0.1" value="1">
+                                <span id="zoom-value" class="ms-2 fw-bold">1.0x</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CỘT PHẢI: TRẠNG THÁI & KẾT QUẢ -->
+            <div class="col-lg-5 d-flex flex-column">
+                <!-- Trạng thái chung -->
+                <div class="card shadow-sm mb-3">
+                    <div class="card-body d-flex justify-content-around align-items-center text-center py-2">
+                        <div>
+                            <h6 class="text-muted small">ĐẠN CÒN LẠI</h6>
+                            <h2 id="ammo-count" class="fw-bold mb-0">16 / 16</h2>
+                        </div>
+                        <div class="vr"></div>
+                        <div>
+                            <h6 class="text-muted small">THỜI GIAN</h6>
+                            <h2 id="timer" class="fw-bold mb-0">01:15</h2>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Lưới hiển thị mặt bia -->
+                <div class="card shadow-sm flex-grow-1 d-flex flex-column">
+                    <div class="card-header fw-bold">Trạng thái Mặt bia</div>
+                    <div class="card-body d-flex align-items-center justify-content-center">
+                        <div id="targets-grid" class="row row-cols-3 g-2 text-center">
+                            <!-- 5 mặt bia sẽ được JS chèn vào đây -->
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Nút chức năng -->
+                <div class="d-flex gap-2 mt-3">
+                    <!-- THÊM MỚI: Nút Bắt đầu -->
+                    <button id="start-btn" class="btn btn-success flex-grow-1"><i class="fa-solid fa-play me-2"></i>Xuất phát</button>
+                    <button id="reset-btn" class="btn btn-danger flex-grow-1"><i class="fa-solid fa-sync-alt me-2"></i>Reset</button>
+                    <button id="review-btn" class="btn btn-outline-info flex-grow-1"><i class="fa-solid fa-images me-2"></i>Xem lại</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Bootstrap 5 JS (cần tải về) -->
+    <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+    <!-- Custom JS -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+# Môi trường ảo (Virtual environment)
+venv/
+.venv/
+
+# Cache và file tạm Python
+__pycache__/
+*.pyc
+
+# File hệ thống
+.DS_Store
+
+# File logs
+*.log
+
+# File cơ sở dữ liệu & uploads runtime
+*.db
+*.sqlite3
+uploads/
+instance/
+
+# Các file cấu hình nhạy cảm
+*.env
+.env.production
+.env.development
+
+# Không ignore toàn bộ *.jpg, trừ khi bạn chắc chắn không muốn giữ ảnh nào
+*.jpg

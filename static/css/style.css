@@ -1,0 +1,97 @@
+html, body {
+    height: 100vh; /* Sử dụng vh để tính theo chiều cao cửa sổ */
+    margin: 0;
+    overflow: hidden; /* Ngăn cuộn toàn trang */
+}
+
+body {
+    display: flex; /* Cho phép main chiếm toàn bộ chiều cao */
+}
+
+main.container-fluid {
+    height: 100%;
+}
+
+.video-container {
+    position: relative;
+    width: 100%;
+    /* padding-top: 75%; Bỏ tỷ lệ cứng để nó co giãn */
+    overflow: hidden;
+    flex-grow: 1; /* Cho phép khung video co giãn */
+}
+
+#video-feed {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover; /* Đổi thành cover để lấp đầy khung */
+    cursor: default;
+}
+
+.target-card {
+    border: 2px solid #495057;
+    border-radius: .375rem;
+    transition: all 0.2s ease-in-out;
+}
+
+.target-card img {
+    width: 100%;
+    height: auto;
+    border-radius: .25rem;
+}
+
+.target-card.hit {
+    border-color: #198754;
+    box-shadow: 0 0 10px rgba(25, 135, 84, 0.7);
+    transform: scale(1.05);
+}
+.target-card {
+    width: 150px;       /* hoặc kích thước bạn muốn */
+    height: 150px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    background-color: #f8f9fa; /* nền sáng Bootstrap */
+    border: 5px solid #dee2e6; /* viền sáng */
+}
+
+/* Ảnh tự co theo khung */
+.target-card img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain; /* giữ tỉ lệ ảnh */
+}
+
+/* Tên ảnh */
+.target-name {
+    font-size: 0.9rem;
+    margin-top: 4px;
+    color: #212529; /* chữ tối trên nền sáng */
+    text-align: center;
+}
+#targets-grid {
+    max-height: 100%;
+    overflow-y: auto; /* cuộn trong khu vực này nếu nhiều ảnh */
+}
+@keyframes flash-border {
+    0%, 100% {
+        border-color: transparent;
+    }
+    50% {
+        border-color: var(--bs-primary); /* Sử dụng biến Bootstrap cho màu xanh lam */
+    }
+}
+
+/* Class để kích hoạt hiệu ứng */
+.target-card.flash {
+    border: 5px solid; 
+    animation: flash-border 1s steps(1, end) infinite; /* Nhấp nháy 1 giây và lặp vô hạn */
+}
+/* Viền đỏ khi đã hoàn thành lượt */
+.target-card.hit-completed {
+    border-color: var(--bs-danger);
+    box-shadow: 0 0 10px rgba(220, 53, 69, 0.7); /* Thêm bóng mờ màu đỏ */
+}
