@@ -11,7 +11,33 @@ document.addEventListener('DOMContentLoaded', function() {
     const timerElement = document.getElementById('timer');
     const targetsGrid = document.getElementById('targets-grid');
     const ammoCountElement = document.getElementById('ammo-count');
+    const videoStatusEl = document.getElementById('video-status');
+    const triggerStatusEl = document.getElementById('trigger-status');
     let isCalibrating = false;
+
+    // --- BIẾN TRẠNG THÁI HỆ THỐNG ---
+    const systemStatus = {
+        video: false,
+        trigger: false
+    };
+    function updateStatusUI(element, componentName, isReady) {
+        if (!element) return;
+        const icon = element.querySelector('.status-icon');
+        const textEl = element.querySelector('.status-text');
+        icon.classList.toggle('text-success', isReady);
+        icon.classList.toggle('text-danger', !isReady);
+        textEl.textContent = isReady ? `${componentName} đã sẵn sàng` : `Đang chờ ${componentName}...`;
+    }
+
+    function checkSystemReady() {
+        if (systemStatus.video && systemStatus.trigger) {
+            startBtn.disabled = false;
+            startBtn.innerHTML = '<i class="fa-solid fa-play me-2"></i>Xuất phát';
+        } else {
+            startBtn.disabled = true;
+            startBtn.innerHTML = '<i class="fa-solid fa-hourglass-half me-2"></i>Đang chờ...';
+        }
+    }
 
     // --- KHAI BÁO ÂM THANH ---
     const startSound = new Audio('/static/sounds/xuat_phat.mp3');
@@ -59,8 +85,16 @@ document.addEventListener('DOMContentLoaded', function() {
     // Kết nối tới server qua SocketIO
     const socket = io.connect(location.protocol + '//' + document.domain + ':' + location.port);
 
-    socket.on('connect', () => {
-        console.log('✅ Giao diện đã kết nối SocketIO tới server!');
+    socket.on('connect', () => console.log('✅ Giao diện đã kết nối SocketIO!'));
+
+    socket.on('disconnect', () => {
+        console.error('⚠️ Mất kết nối tới server!');
+        // Khi mất kết nối server, reset tất cả trạng thái
+        systemStatus.video = false;
+        systemStatus.trigger = false;
+        updateStatusUI(videoStatusEl, 'Video', false);
+        updateStatusUI(triggerStatusEl, 'Cò', false);
+        checkSystemReady();
     });
 
     // Lắng nghe sự kiện 'ammo_updated' từ server
@@ -69,6 +103,20 @@ document.addEventListener('DOMContentLoaded', function() {
         if (ammoCountElement) {
             ammoCountElement.textContent = (data.ammo + ' / 16');
         }
+    });
+
+    socket.on('status_updated', function(data) {
+        const { component, status } = data;
+        const isReady = (status === 'ready');
+
+        if (component === 'video') {
+            systemStatus.video = isReady;
+            updateStatusUI(videoStatusEl, 'Video', isReady);
+        } else if (component === 'trigger') {
+            systemStatus.trigger = isReady;
+            updateStatusUI(triggerStatusEl, 'Cò', isReady);
+        }
+        checkSystemReady();
     });
     // =================================================================
 
@@ -195,6 +243,6 @@ document.addEventListener('DOMContentLoaded', function() {
             targetsGrid.appendChild(targetWrapper);
         });
     }
-
+    checkSystemReady();
     createTargetPlaceholders();
 });

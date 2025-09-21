@@ -48,6 +48,19 @@
 
             <!-- CỘT PHẢI: TRẠNG THÁI & KẾT QUẢ -->
             <div class="col-lg-5 d-flex flex-column">
+                <div class="card shadow-sm mb-3">
+                    <div class="card-header fw-bold">Trạng thái Hệ thống</div>
+                    <div class="card-body d-flex justify-content-around">
+                        <div id="video-status" class="status-indicator d-flex align-items-center gap-2">
+                            <i class="status-icon fa-solid fa-circle text-danger"></i>
+                            <span class="status-text fw-medium">Đang chờ Video...</span>
+                        </div>
+                        <div id="trigger-status" class="status-indicator d-flex align-items-center gap-2">
+                            <i class="status-icon fa-solid fa-circle text-danger"></i>
+                            <span class="status-text fw-medium">Đang chờ Cò...</span>
+                        </div>
+                    </div>
+                </div>
                 <!-- Trạng thái chung -->
                 <div class="card shadow-sm mb-3">
                     <div class="card-body d-flex justify-content-around align-items-center text-center py-2">
