@@ -1,0 +1,29 @@
+<div class="modal fade" id="session-end-modal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="sessionEndModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-primary border-2 shadow-lg">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="sessionEndModalLabel">
+                    <i class="fa-solid fa-flag-checkered me-2"></i>
+                    Hoàn thành bài bắn
+                </h5>
+            </div>
+            <div class="modal-body text-center py-4">
+                <div id="shot-review-container" class="mb-3">
+                    <h5 id="modal-end-reason" class="fw-bold mb-2">Lý do...</h5>
+                    <div class="shot-image-wrapper bg-dark rounded p-1" style="min-height: 360px; display: flex; align-items: center; justify-content: center;">
+                        <img id="shot-review-image" src="" alt="Ảnh phát bắn" class="img-fluid" style="max-height: 360px;">
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mt-2">
+                        <button id="prev-shot-btn" class="btn btn-secondary"><i class="fa-solid fa-chevron-left"></i> Trước</button>
+                        <span id="shot-counter" class="fw-bold">Ảnh 0 / 0</span>
+                        <button id="next-shot-btn" class="btn btn-secondary">Sau <i class="fa-solid fa-chevron-right"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary w-50" data-bs-dismiss="modal">Đóng</button>
+                <button id="modal-reload-button" type="button" class="btn btn-primary w-50">Bắn lại từ đầu</button>
+            </div>
+        </div>
+    </div>
+</div>

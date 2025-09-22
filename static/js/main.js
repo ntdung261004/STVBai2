@@ -20,7 +20,20 @@ document.addEventListener('DOMContentLoaded', function() {
     const modalErrorMessageEl = document.getElementById('modal-error-message');
     const modalResetButton = document.getElementById('modal-reset-button');
 
+    // **THÊM MỚI: Khai báo các phần tử của Modal Kết thúc Phiên**
+    const sessionEndModalEl = document.getElementById('session-end-modal');
+    const sessionEndModal = new bootstrap.Modal(sessionEndModalEl);
+    const modalEndReasonEl = document.getElementById('modal-end-reason');
+    const modalReloadButton = document.getElementById('modal-reload-button');
+    // **THÊM MỚI: Khai báo các phần tử của Trình xem ảnh trong Modal**
+    const shotReviewImage = document.getElementById('shot-review-image');
+    const shotCounter = document.getElementById('shot-counter');
+    const prevShotBtn = document.getElementById('prev-shot-btn');
+    const nextShotBtn = document.getElementById('next-shot-btn');
+
     let isCalibrating = false;
+    let capturedShots = [];
+    let currentShotIndex = 0;
 
     // --- BIẾN QUẢN LÝ TRẠNG THÁI HỆ THỐNG ---
     const systemStatus = {
@@ -152,6 +165,72 @@ document.addEventListener('DOMContentLoaded', function() {
         checkSystemReady();
     });
 
+    socket.on('display_new_shot', function(data) {
+        console.log(`Nhận được ảnh cho phát bắn ${data.shot_id}`);
+        capturedShots.push(data.image_data);
+    });
+
+    // **SỬA ĐỔI: Sự kiện kết thúc phiên**
+    socket.on('session_ended', function(data) {
+        console.log(`✅ Kết thúc phiên. Lý do: ${data.reason}. Có ${capturedShots.length} ảnh.`);
+        isSessionActive = false;
+
+        if (timerInterval) {
+            clearInterval(timerInterval);
+        }
+
+        let reasonText = 'Phiên tập đã hoàn thành!';
+        if (data.reason === 'Hết thời gian') reasonText = 'Bạn đã hết thời gian.';
+        else if (data.reason === 'Hết đạn') reasonText = 'Bạn đã bắn hết đạn.';
+        modalEndReasonEl.textContent = reasonText;
+
+        // **LOGIC MỚI: Khởi tạo trình xem ảnh**
+        currentShotIndex = 0; // Luôn bắt đầu từ ảnh đầu tiên
+        updateShotReviewUI(); // Gọi hàm hiển thị ảnh
+
+        setTimeout(() => sessionEndModal.show(), 500);
+
+        startBtn.disabled = false;
+    });
+
+    function updateShotReviewUI() {
+        const totalShots = capturedShots.length;
+        if (totalShots === 0) {
+            shotReviewImage.style.display = 'none'; // Ẩn khung ảnh
+            shotCounter.textContent = 'Không có phát bắn nào';
+            prevShotBtn.disabled = true;
+            nextShotBtn.disabled = true;
+            return;
+        }
+
+        shotReviewImage.style.display = 'block'; // Hiện khung ảnh
+        shotReviewImage.src = capturedShots[currentShotIndex];
+        shotCounter.textContent = `Ảnh ${currentShotIndex + 1} / ${totalShots}`;
+
+        // Bật/tắt nút "Trước", "Sau"
+        prevShotBtn.disabled = (currentShotIndex === 0);
+        nextShotBtn.disabled = (currentShotIndex >= totalShots - 1);
+    }
+
+    // **THÊM MỚI: Gán sự kiện cho các nút điều khiển ảnh**
+    if (prevShotBtn) {
+        prevShotBtn.addEventListener('click', () => {
+            if (currentShotIndex > 0) {
+                currentShotIndex--;
+                updateShotReviewUI();
+            }
+        });
+    }
+
+    if (nextShotBtn) {
+        nextShotBtn.addEventListener('click', () => {
+            if (currentShotIndex < capturedShots.length - 1) {
+                currentShotIndex++;
+                updateShotReviewUI();
+            }
+        });
+    }
+
     if (modalResetButton) {
         modalResetButton.addEventListener('click', () => {
             // Chỉ cần tải lại trang, vì lệnh reset đã được gửi đi khi modal hiện ra
@@ -159,10 +238,20 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    if (modalReloadButton) {
+        modalReloadButton.addEventListener('click', () => {
+            location.reload();
+        });
+    }
+
     // --- CÁC SỰ KIỆN NÚT BẤM VÀ TƯƠNG TÁC ---
     if (startBtn) {
         startBtn.addEventListener('click', () => {
-            sendCommand('start', true); 
+            // Xóa ảnh của phiên cũ trước khi bắt đầu phiên mới
+            capturedShots = [];
+            currentShotIndex = 0;
+            
+            sendCommand('start', true);
             isSessionActive = true;
             checkSystemReady();
             if (ammoCountElement) {
@@ -208,30 +297,21 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (resetBtn) {
         resetBtn.addEventListener('click', () => {
-            console.log("Nút Reset được nhấn, gửi lệnh 'reset' đến Pi.");
-            // Gửi lệnh yêu cầu Pi hủy phiên tập hiện tại
-            isSessionActive = false;
-            if(timerInterval) clearInterval(timerInterval);
             sendCommand('reset', true);
-            
-            // Đợi một chút để lệnh được gửi đi rồi mới tải lại trang
-            setTimeout(() => {
-                location.reload();
-            }, 200); // Đợi 200ms
+            setTimeout(() => location.reload(), 200);
         });
     }
 
     // --- LOGIC CHÍNH CỦA BÀI BẮN (GIỮ NGUYÊN CỦA BẠN) ---
     function runTargetSequence() {
         let timeLeft = 75;
-        const countdown = setInterval(() => {
+        // SỬA ĐỔI: Gán vào biến timerInterval thay vì const countdown
+        timerInterval = setInterval(() => {
             if (timeLeft < 0) {
-                clearInterval(countdown);
+                clearInterval(timerInterval);
                 timesUpSound.play();
                 timerElement.textContent = '00:00';
-                // Kích hoạt lại nút Xuất phát khi hết giờ
-                startBtn.disabled = false; 
-                startBtn.innerHTML = '<i class="fa-solid fa-play me-2"></i>Bắt đầu lại';
+                // Xóa logic cũ ở đây vì đã có sự kiện session_ended xử lý
                 return;
             }
             
@@ -259,7 +339,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (timeLeft === 0)  { 
                 targetElements.t5.classList.remove('flash'); targetElements.t5.classList.add('hit-completed'); 
                 targetElements.t6.classList.remove('flash'); targetElements.t6.classList.add('hit-completed'); 
-                targetSounds.bia8c_an.play();
+                timesUpSound.play()
             }
 
             timeLeft--;

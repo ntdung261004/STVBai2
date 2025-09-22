@@ -23,6 +23,17 @@ def handle_status_update(data):
 def handle_ammo_update(data):
     """Nhận số đạn từ Pi và chuyển tiếp."""
     socketio.emit('ammo_updated', data)
-
+    
+@socketio.on('session_ended')
+def handle_session_ended(data):
+    """Nhận sự kiện kết thúc phiên từ Pi và chuyển tiếp cho giao diện."""
+    print(f"Server: Chuyển tiếp sự kiện kết thúc phiên -> Lý do: {data.get('reason')}")
+    socketio.emit('session_ended', data)
+    
+@socketio.on('new_shot_image')
+def handle_new_shot(data):
+    """Nhận ảnh đã xử lý từ Pi và chuyển tiếp cho giao diện."""
+    # print(f"Server: Nhận ảnh phát bắn {data.get('shot_id')}, đang chuyển tiếp...")
+    socketio.emit('display_new_shot', data)
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000, debug=False, allow_unsafe_werkzeug=True)
