@@ -13,7 +13,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const ammoCountElement = document.getElementById('ammo-count');
     const videoStatusEl = document.getElementById('video-status');
     const triggerStatusEl = document.getElementById('trigger-status');
-    
+
+    // **THÊM MỚI: Khai báo các phần tử của Modal**
+    const sessionErrorModalEl = document.getElementById('session-error-modal');
+    const sessionErrorModal = new bootstrap.Modal(sessionErrorModalEl);
+    const modalErrorMessageEl = document.getElementById('modal-error-message');
+    const modalResetButton = document.getElementById('modal-reset-button');
+
     let isCalibrating = false;
 
     // --- BIẾN QUẢN LÝ TRẠNG THÁI HỆ THỐNG ---
@@ -115,19 +121,43 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // **SỬA ĐỔI: Thêm logic xử lý lỗi vào sự kiện status_updated**
     socket.on('status_updated', function(data) {
         const { component, status } = data;
         const isReady = (status === 'ready');
 
-        if (component === 'video') {
-            systemStatus.video = isReady;
-            updateStatusUI(videoStatusEl, 'Video', isReady);
-        } else if (component === 'trigger') {
-            systemStatus.trigger = isReady;
-            updateStatusUI(triggerStatusEl, 'Cò', isReady);
+        // **LOGIC MỚI: Nếu đang trong phiên tập mà có thiết bị mất kết nối**
+        if (isSessionActive && !isReady) {
+            const deviceName = (component === 'video') ? 'Camera' : 'Cò bắn';
+            modalErrorMessageEl.textContent = `Mất kết nối với ${deviceName}. Phiên tập sẽ được hủy và khởi động lại.`;
+            
+            // Hiển thị modal
+            sessionErrorModal.show();
+
+            // Gửi lệnh reset về Pi để hủy phiên
+            sendCommand('reset', true);
+            
+            // Dừng mọi timer đang chạy trên giao diện
+            if (timerInterval) clearInterval(timerInterval);
+
+            // Dừng xử lý thêm để tránh cập nhật giao diện không cần thiết
+            return; 
         }
+
+        // Logic cũ: Cập nhật trạng thái và nút bấm khi không trong phiên tập
+        if (component === 'video') systemStatus.video = isReady;
+        else if (component === 'trigger') systemStatus.trigger = isReady;
+        
+        updateStatusUI(component === 'video' ? videoStatusEl : triggerStatusEl, component === 'video' ? 'Video' : 'Cò', isReady);
         checkSystemReady();
     });
+
+    if (modalResetButton) {
+        modalResetButton.addEventListener('click', () => {
+            // Chỉ cần tải lại trang, vì lệnh reset đã được gửi đi khi modal hiện ra
+            location.reload();
+        });
+    }
 
     // --- CÁC SỰ KIỆN NÚT BẤM VÀ TƯƠNG TÁC ---
     if (startBtn) {
