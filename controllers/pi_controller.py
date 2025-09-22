@@ -2,17 +2,16 @@
 from flask import Blueprint, request, jsonify, Response
 import threading
 import time
-import queue # Thêm thư viện hàng đợi
-import cv2  # <-- Thêm mới
-import numpy as np # <-- Thêm mới
+import queue
+import cv2
+import numpy as np
+
 pi_bp = Blueprint('pi_bp', __name__)
 
-# --- HÀNG ĐỢI LỆNH ---
-# Hàng đợi này sẽ lưu các lệnh từ frontend gửi cho Pi
 COMMAND_QUEUE = queue.Queue(maxsize=10)
 
 def create_disconnect_image():
-    """Tạo một khung hình màu đen với thông báo mất kết nối."""
+    """Tạo một khung hình màu đen với thông báo chờ tín hiệu."""
     img = np.zeros((480, 640, 3), dtype=np.uint8)
     text = "Cho tin hieu tu camera..."
     font = cv2.FONT_HERSHEY_SIMPLEX
@@ -24,33 +23,38 @@ def create_disconnect_image():
     return buffer.tobytes()
 
 class LivestreamManager:
+    """
+    Quản lý khung hình livestream từ Pi.
+    Tự động hiển thị ảnh "mất kết nối" nếu không nhận được khung hình mới sau 2 giây.
+    """
     def __init__(self):
         self.frame = None
         self.lock = threading.Lock()
-        self.last_update_time = 0 # <-- Thêm mới: Theo dõi thời gian
-        self.disconnected_frame = create_disconnect_image() # <-- Thêm mới: Tạo ảnh chờ
+        self.last_update_time = 0
+        self.disconnected_image = create_disconnect_image()
+        self.CONNECTION_TIMEOUT = 2.0  # Giây
 
-    def update_frame(self, frame):
+    def update_frame(self, new_frame):
         with self.lock:
-            self.frame = frame
-            self.last_update_time = time.time() # <-- Thêm mới: Cập nhật thời gian
+            self.frame = new_frame
+            self.last_update_time = time.time()
 
     def generate_frames_for_client(self):
         while True:
-            time.sleep(1/30) # Tần suất làm mới của trình duyệt
             with self.lock:
-                # **SỬA ĐỔI**: Kiểm tra nếu khung hình quá cũ
-                if time.time() - self.last_update_time > 3.0:
-                    # Nếu quá 3 giây không có khung hình mới, gửi ảnh báo mất kết nối
-                    frame_to_send = self.disconnected_frame
-                elif self.frame is None:
-                    # Nếu chưa có khung hình nào, cũng gửi ảnh báo mất kết nối
-                    frame_to_send = self.disconnected_frame
-                else:
-                    frame_to_send = self.frame
-            
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + frame_to_send + b'\r\n')
+                is_disconnected = (time.time() - self.last_update_time) > self.CONNECTION_TIMEOUT
+                
+                # Nếu mất kết nối hoặc chưa từng có khung hình nào
+                if is_disconnected or self.frame is None:
+                    yield (b'--frame\r\n'
+                           b'Content-Type: image/jpeg\r\n\r\n' + self.disconnected_image + b'\r\n')
+                    time.sleep(0.5)  # Đợi một chút trước khi gửi lại ảnh disconnect
+                    continue
+                
+                # Nếu kết nối bình thường, gửi khung hình nhận được
+                yield (b'--frame\r\n'
+                       b'Content-Type: image/jpeg\r\n\r\n' + self.frame + b'\r\n')
+            time.sleep(1/30) # Stream ở ~30 FPS
 
 livestream_manager = LivestreamManager()
 
@@ -64,43 +68,23 @@ def video_upload():
 
 @pi_bp.route('/video_feed')
 def video_feed():
-    return Response(livestream_manager.generate_frames_for_client(), 
+    return Response(livestream_manager.generate_frames_for_client(),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
-
-# === BẮT ĐẦU PHẦN THÊM MỚI: API ĐIỀU KHIỂN ===
 
 @pi_bp.route('/command', methods=['POST'])
 def handle_command():
-    """
-    API endpoint chung để nhận lệnh từ frontend (zoom, hiệu chỉnh tâm).
-    """
     data = request.get_json()
-    command_type = data.get('type')
-    command_value = data.get('value')
-
-    if not command_type or command_value is None:
-        return jsonify({'status': 'error', 'message': 'Dữ liệu không hợp lệ.'}), 400
-
-    command = {'type': command_type, 'value': command_value}
-    
+    command = {'type': data.get('type'), 'value': data.get('value')}
     try:
-        # Đưa lệnh vào hàng đợi để Pi có thể lấy
         COMMAND_QUEUE.put_nowait(command)
-        return jsonify({'status': 'success', 'message': f'Đã gửi lệnh {command_type}'})
+        return jsonify({'status': 'success'})
     except queue.Full:
-        return jsonify({'status': 'error', 'message': 'Hàng đợi lệnh đang đầy.'}), 503
+        return jsonify({'status': 'error', 'message': 'Hàng đợi lệnh đầy.'}), 503
 
 @pi_bp.route('/get_command', methods=['GET'])
 def get_command():
-    """
-    API endpoint để Raspberry Pi hỏi và lấy lệnh mới nhất.
-    """
     try:
-        # Lấy lệnh từ hàng đợi mà không bị block
         command = COMMAND_QUEUE.get_nowait()
-        return jsonify({'command': command})
+        return jsonify({'status': 'success', 'command': command})
     except queue.Empty:
-        # Nếu không có lệnh, trả về không có lệnh
-        return jsonify({'command': None})
-
-# === KẾT THÚC PHẦN THÊM MỚI ===
+        return jsonify({'status': 'success', 'command': None})

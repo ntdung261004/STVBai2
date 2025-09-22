@@ -1,7 +1,7 @@
 // file: static/js/main.js
 
 document.addEventListener('DOMContentLoaded', function() {
-    // --- KHAI BÁO CÁC PHẦN TỬ DOM ---
+    // --- KHAI BÁO CÁC PHẦN TỬ GIAO DIỆN (DOM ELEMENTS) ---
     const videoFeed = document.getElementById('video-feed');
     const startBtn = document.getElementById('start-btn');
     const resetBtn = document.getElementById('reset-btn');
@@ -13,33 +13,52 @@ document.addEventListener('DOMContentLoaded', function() {
     const ammoCountElement = document.getElementById('ammo-count');
     const videoStatusEl = document.getElementById('video-status');
     const triggerStatusEl = document.getElementById('trigger-status');
+    
     let isCalibrating = false;
 
-    // --- BIẾN TRẠNG THÁI HỆ THỐNG ---
+    // --- BIẾN QUẢN LÝ TRẠNG THÁI HỆ THỐNG ---
     const systemStatus = {
         video: false,
         trigger: false
     };
+    let isSessionActive = false;
+    let timerInterval = null;
+    /**
+     * Cập nhật giao diện (icon và text) cho trạng thái của một thành phần.
+     * @param {HTMLElement} element - Element cha chứa icon và text.
+     * @param {string} componentName - Tên thành phần (vd: "Video").
+     * @param {boolean} isReady - Trạng thái sẵn sàng.
+     */
     function updateStatusUI(element, componentName, isReady) {
         if (!element) return;
         const icon = element.querySelector('.status-icon');
         const textEl = element.querySelector('.status-text');
+        
         icon.classList.toggle('text-success', isReady);
         icon.classList.toggle('text-danger', !isReady);
         textEl.textContent = isReady ? `${componentName} đã sẵn sàng` : `Đang chờ ${componentName}...`;
     }
 
+    /**
+     * Kiểm tra trạng thái tổng thể và bật/tắt nút "Xuất phát".
+     */
     function checkSystemReady() {
-        if (systemStatus.video && systemStatus.trigger) {
+        if (isSessionActive) {
+            // Nếu phiên đang diễn ra, nút Xuất phát LUÔN BỊ VÔ HIỆU HÓA
+            startBtn.disabled = true;
+            startBtn.innerHTML = '<i class="fa-solid fa-hourglass-start me-2"></i>Đang bắn...';
+        } else if (systemStatus.video && systemStatus.trigger) {
+            // Nếu không có phiên nào và thiết bị sẵn sàng, KÍCH HOẠT nút
             startBtn.disabled = false;
             startBtn.innerHTML = '<i class="fa-solid fa-play me-2"></i>Xuất phát';
         } else {
+            // Nếu không có phiên và thiết bị chưa sẵn sàng, VÔ HIỆU HÓA nút
             startBtn.disabled = true;
             startBtn.innerHTML = '<i class="fa-solid fa-hourglass-half me-2"></i>Đang chờ...';
         }
     }
 
-    // --- KHAI BÁO ÂM THANH ---
+    // --- KHAI BÁO CÁC FILE ÂM THANH ---
     const startSound = new Audio('/static/sounds/xuat_phat.mp3');
     const timesUpSound = new Audio('/static/sounds/het_thoi_gian.mp3');
     const targetSounds = {
@@ -56,22 +75,19 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     /**
-     * HÀM GỬI LỆNH CHUNG TỚI SERVER
-     * @param {string} type - Loại lệnh ('zoom', 'center', 'start')
-     * @param {any} value - Giá trị của lệnh
+     * Gửi lệnh (zoom, center, start) tới server để Pi xử lý.
+     * @param {string} type - Loại lệnh.
+     * @param {any} value - Giá trị của lệnh.
      */
     async function sendCommand(type, value) {
         console.log(`Gửi lệnh: ${type}`, value);
         try {
-            const response = await fetch('/pi/command', { // <-- SỬA LẠI URL CHO ĐÚNG BLUEPRINT
+            const response = await fetch('/pi/command', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ type, value })
             });
-            if (response.ok) {
-                const data = await response.json();
-                console.log('Phản hồi từ server:', data.message);
-            } else {
+            if (!response.ok) {
                 console.error('Lỗi khi gửi lệnh, server phản hồi:', response.statusText);
             }
         } catch (error) {
@@ -79,29 +95,23 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // =================================================================
-    // THÊM MỚI: KẾT NỐI SOCKETIO VÀ LẮNG NGHE SỰ KIỆN
-    // =================================================================
-    // Kết nối tới server qua SocketIO
+    // --- KẾT NỐI SOCKET.IO VÀ LẮNG NGHE SỰ KIỆN TỪ SERVER ---
     const socket = io.connect(location.protocol + '//' + document.domain + ':' + location.port);
 
     socket.on('connect', () => console.log('✅ Giao diện đã kết nối SocketIO!'));
 
     socket.on('disconnect', () => {
-        console.error('⚠️ Mất kết nối tới server!');
-        // Khi mất kết nối server, reset tất cả trạng thái
         systemStatus.video = false;
         systemStatus.trigger = false;
+        isSessionActive = false; // Reset trạng thái phiên khi mất kết nối
         updateStatusUI(videoStatusEl, 'Video', false);
         updateStatusUI(triggerStatusEl, 'Cò', false);
         checkSystemReady();
     });
 
-    // Lắng nghe sự kiện 'ammo_updated' từ server
     socket.on('ammo_updated', function(data) {
-        console.log('Nhận được số đạn mới:', data.ammo);
         if (ammoCountElement) {
-            ammoCountElement.textContent = (data.ammo + ' / 16');
+            ammoCountElement.textContent = `${data.ammo} / 16`;
         }
     });
 
@@ -118,74 +128,23 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         checkSystemReady();
     });
-    // =================================================================
 
-
-    // =================================================================
-    // SỬA ĐỔI: SỰ KIỆN CHO NÚT XUẤT PHÁT
-    // =================================================================
+    // --- CÁC SỰ KIỆN NÚT BẤM VÀ TƯƠNG TÁC ---
     if (startBtn) {
         startBtn.addEventListener('click', () => {
-            console.log("Nút Xuất phát được nhấn.");
-            
-            // 1. Gửi lệnh 'start' đến server cho Pi
             sendCommand('start', true); 
-            // **SỬA ĐỔI**: Reset số đạn trên giao diện về 16 ngay khi nhấn
+            isSessionActive = true;
+            checkSystemReady();
             if (ammoCountElement) {
                 ammoCountElement.textContent = '16 / 16';
             }
-            // 2. Bắt đầu các hiệu ứng trên giao diện
             startSound.play();
             startBtn.disabled = true;
             startBtn.innerHTML = '<i class="fa-solid fa-hourglass-start me-2"></i>Đang bắn...';
-            
-            // 3. Khởi chạy timer và logic hiện bia (giữ nguyên logic của bạn)
             runTargetSequence(); 
         });
     }
-    // =================================================================
     
-    // Hàm chạy timer và trình tự bia (tách ra từ code gốc của bạn)
-    function runTargetSequence() {
-        let timeLeft = 75;
-        const countdown = setInterval(() => {
-            if (timeLeft < 0) {
-                clearInterval(countdown);
-                timesUpSound.play();
-                timerElement.textContent = '00:00';
-                return;
-            }
-            
-            let minutes = String(Math.floor(timeLeft / 60)).padStart(2, '0');
-            let seconds = String(timeLeft % 60).padStart(2, '0');
-            timerElement.textContent = `${minutes}:${seconds}`;
-
-            // Logic hiện/ẩn bia của bạn...
-            const targetElements = {
-                t1: document.getElementById('target-1'),
-                t2: document.getElementById('target-2'),
-                t3: document.getElementById('target-3'),
-                t4: document.getElementById('target-4'),
-                t5: document.getElementById('target-5'),
-                t6: document.getElementById('target-6')
-            };
-
-            if (timeLeft === 60) { targetElements.t1.classList.add('flash'); targetSounds.bia6_hien.play(); }
-            if (timeLeft === 54) { targetElements.t1.classList.remove('flash'); targetElements.t1.classList.add('hit-completed'); targetSounds.bia6_an.play(); }
-            if (timeLeft === 51) { targetElements.t2.classList.add('flash'); targetSounds.bia5_hien.play(); }
-            if (timeLeft === 45) { targetElements.t2.classList.remove('flash'); targetElements.t2.classList.add('hit-completed'); targetSounds.bia5_an.play(); }
-            if (timeLeft === 35) { targetElements.t3.classList.add('flash'); targetSounds.bia10_hien.play(); }
-            if (timeLeft === 30) { targetElements.t3.classList.remove('flash'); targetElements.t3.classList.add('hit-completed'); targetSounds.bia10_an.play(); }
-            if (timeLeft === 27) { targetElements.t4.classList.add('flash'); targetSounds.bia7b_hien.play(); }
-            if (timeLeft === 22) { targetElements.t4.classList.remove('flash'); targetElements.t4.classList.add('hit-completed'); targetSounds.bia7b_an.play(); }
-            if (timeLeft === 7)  { targetElements.t5.classList.add('flash'); targetElements.t6.classList.add('flash'); targetSounds.bia8c_hien.play(); }
-            if (timeLeft === 0)  { targetElements.t5.classList.remove('flash'); targetElements.t5.classList.add('hit-completed'); targetElements.t6.classList.remove('flash'); targetElements.t6.classList.add('hit-completed'); }
-
-            timeLeft--;
-        }, 1000);
-    }
-
-    // --- CÁC SỰ KIỆN KHÁC (Hiệu chỉnh, Zoom, Reset - giữ nguyên) ---
     if (calibrateBtn) {
         calibrateBtn.addEventListener('click', () => {
             isCalibrating = !isCalibrating;
@@ -218,10 +177,66 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     if (resetBtn) {
-        resetBtn.addEventListener('click', () => location.reload());
+        resetBtn.addEventListener('click', () => {
+            console.log("Nút Reset được nhấn, gửi lệnh 'reset' đến Pi.");
+            // Gửi lệnh yêu cầu Pi hủy phiên tập hiện tại
+            isSessionActive = false;
+            if(timerInterval) clearInterval(timerInterval);
+            sendCommand('reset', true);
+            
+            // Đợi một chút để lệnh được gửi đi rồi mới tải lại trang
+            setTimeout(() => {
+                location.reload();
+            }, 200); // Đợi 200ms
+        });
     }
 
-    // --- KHỞI TẠO GIAO DIỆN ---
+    // --- LOGIC CHÍNH CỦA BÀI BẮN (GIỮ NGUYÊN CỦA BẠN) ---
+    function runTargetSequence() {
+        let timeLeft = 75;
+        const countdown = setInterval(() => {
+            if (timeLeft < 0) {
+                clearInterval(countdown);
+                timesUpSound.play();
+                timerElement.textContent = '00:00';
+                // Kích hoạt lại nút Xuất phát khi hết giờ
+                startBtn.disabled = false; 
+                startBtn.innerHTML = '<i class="fa-solid fa-play me-2"></i>Bắt đầu lại';
+                return;
+            }
+            
+            let minutes = String(Math.floor(timeLeft / 60)).padStart(2, '0');
+            let seconds = String(timeLeft % 60).padStart(2, '0');
+            timerElement.textContent = `${minutes}:${seconds}`;
+
+            // Lấy các element của mặt bia
+            const targetElements = {
+                t1: document.getElementById('target-1'), t2: document.getElementById('target-2'),
+                t3: document.getElementById('target-3'), t4: document.getElementById('target-4'),
+                t5: document.getElementById('target-5'), t6: document.getElementById('target-6')
+            };
+
+            // Dòng thời gian hiện/ẩn bia và phát âm thanh
+            if (timeLeft === 60) { targetElements.t1.classList.add('flash'); targetSounds.bia6_hien.play(); }
+            if (timeLeft === 54) { targetElements.t1.classList.remove('flash'); targetElements.t1.classList.add('hit-completed'); targetSounds.bia6_an.play(); }
+            if (timeLeft === 51) { targetElements.t2.classList.add('flash'); targetSounds.bia5_hien.play(); }
+            if (timeLeft === 45) { targetElements.t2.classList.remove('flash'); targetElements.t2.classList.add('hit-completed'); targetSounds.bia5_an.play(); }
+            if (timeLeft === 35) { targetElements.t3.classList.add('flash'); targetSounds.bia10_hien.play(); }
+            if (timeLeft === 30) { targetElements.t3.classList.remove('flash'); targetElements.t3.classList.add('hit-completed'); targetSounds.bia10_an.play(); }
+            if (timeLeft === 27) { targetElements.t4.classList.add('flash'); targetSounds.bia7b_hien.play(); }
+            if (timeLeft === 22) { targetElements.t4.classList.remove('flash'); targetElements.t4.classList.add('hit-completed'); targetSounds.bia7b_an.play(); }
+            if (timeLeft === 7)  { targetElements.t5.classList.add('flash'); targetElements.t6.classList.add('flash'); targetSounds.bia8c_hien.play(); }
+            if (timeLeft === 0)  { 
+                targetElements.t5.classList.remove('flash'); targetElements.t5.classList.add('hit-completed'); 
+                targetElements.t6.classList.remove('flash'); targetElements.t6.classList.add('hit-completed'); 
+                targetSounds.bia8c_an.play();
+            }
+
+            timeLeft--;
+        }, 1000);
+    }
+
+    // --- HÀM KHỞI TẠO GIAO DIỆN BAN ĐẦU ---
     function createTargetPlaceholders() {
         const targets = [
             { img: '/static/images/targets/bia_so_6.png', name: 'Bia số 6' },
@@ -243,6 +258,8 @@ document.addEventListener('DOMContentLoaded', function() {
             targetsGrid.appendChild(targetWrapper);
         });
     }
+
+    // --- CHẠY CÁC HÀM KHỞI TẠO ---
     checkSystemReady();
     createTargetPlaceholders();
 });
