@@ -30,6 +30,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const shotCounter = document.getElementById('shot-counter');
     const prevShotBtn = document.getElementById('prev-shot-btn');
     const nextShotBtn = document.getElementById('next-shot-btn');
+    const modalTotalShots = document.getElementById('modal-total-shots');
 
     let isCalibrating = false;
     let capturedShots = [];
@@ -172,25 +173,39 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // **SỬA ĐỔI: Sự kiện kết thúc phiên**
     socket.on('session_ended', function(data) {
-        console.log(`✅ Kết thúc phiên. Lý do: ${data.reason}. Có ${capturedShots.length} ảnh.`);
+        console.log(`✅ Nhận lệnh kết thúc phiên. Lý do: ${data.reason}. Chờ đủ ${data.total_shots} ảnh.`);
         isSessionActive = false;
-
         if (timerInterval) {
             clearInterval(timerInterval);
         }
+        
+        // Hàm kiểm tra và hiển thị modal
+        const checkAndShowModal = () => {
+            // Nếu số ảnh nhận được chưa đủ, chờ 100ms nữa rồi kiểm tra lại
+            if (capturedShots.length < data.total_shots) {
+                setTimeout(checkAndShowModal, 100);
+                return; 
+            }
 
-        let reasonText = 'Phiên tập đã hoàn thành!';
-        if (data.reason === 'Hết thời gian') reasonText = 'Bạn đã hết thời gian.';
-        else if (data.reason === 'Hết đạn') reasonText = 'Bạn đã bắn hết đạn.';
-        modalEndReasonEl.textContent = reasonText;
+            // Đã nhận đủ ảnh, tiến hành hiển thị modal
+            console.log(`Đã nhận đủ ${capturedShots.length} ảnh. Hiển thị modal.`);
+            let reasonText = 'Phiên tập đã hoàn thành!';
+            if (data.reason === 'Hết thời gian') reasonText = 'Bạn đã hết thời gian.';
+            else if (data.reason === 'Hết đạn') reasonText = 'Bạn đã bắn hết đạn.';
+            modalEndReasonEl.textContent = reasonText;
+            modalTotalShots.textContent = data.total_shots;
+            currentShotIndex = 0;
+            updateShotReviewUI(); 
 
-        // **LOGIC MỚI: Khởi tạo trình xem ảnh**
-        currentShotIndex = 0; // Luôn bắt đầu từ ảnh đầu tiên
-        updateShotReviewUI(); // Gọi hàm hiển thị ảnh
+            setTimeout(() => sessionEndModal.show(), 500);
 
-        setTimeout(() => sessionEndModal.show(), 500);
+            startBtn.disabled = false;
+            // Cập nhật nút Xuất phát thành Bắn lại
+            startBtn.innerHTML = '<i class="fa-solid fa-redo me-2"></i>Bắn lại';
+        };
 
-        startBtn.disabled = false;
+        // Bắt đầu quá trình kiểm tra
+        checkAndShowModal();
     });
 
     function updateShotReviewUI() {
