@@ -2,10 +2,15 @@
 from flask import Flask, render_template
 from flask_socketio import SocketIO
 from controllers.pi_controller import pi_bp
+import logging
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key_here!' 
 socketio = SocketIO(app, cors_allowed_origins="*")
+
+# --- THÊM 2 DÒNG TỐI ƯU LOG TẠI ĐÂY ---
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)
 
 app.register_blueprint(pi_bp, url_prefix='/pi')
 
@@ -35,5 +40,12 @@ def handle_new_shot(data):
     """Nhận ảnh đã xử lý từ Pi và chuyển tiếp cho giao diện."""
     # print(f"Server: Nhận ảnh phát bắn {data.get('shot_id')}, đang chuyển tiếp...")
     socketio.emit('display_new_shot', data)
+    
+@socketio.on('target_hit_update')
+def handle_target_hit(data):
+    """Nhận thông báo mục tiêu bị trúng từ Pi và chuyển tiếp cho giao diện."""
+    print(f"Server: Chuyển tiếp thông báo trúng mục tiêu -> {data.get('target_name')}")
+    socketio.emit('ui_target_hit', data)
+    
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000, debug=False, allow_unsafe_werkzeug=True)

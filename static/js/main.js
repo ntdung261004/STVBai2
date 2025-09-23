@@ -30,8 +30,24 @@ document.addEventListener('DOMContentLoaded', function() {
     const shotCounter = document.getElementById('shot-counter');
     const prevShotBtn = document.getElementById('prev-shot-btn');
     const nextShotBtn = document.getElementById('next-shot-btn');
-    const modalTotalShots = document.getElementById('modal-total-shots');
 
+    // **THÊM MỚI: Khai báo các phần tử của Modal Kết quả**
+    const modalHitCount = document.getElementById('modal-hit-count');
+    const modalAchievementBadge = document.getElementById('modal-achievement-badge');
+    // **THÊM MỚI:**
+    const modalLoadingState = document.getElementById('modal-loading-state');
+    const modalResultsContent = document.getElementById('modal-results-content');
+
+    // **THÊM MỚI: Hằng số để map tên mục tiêu từ AI sang ID của giao diện**
+    const TARGET_NAME_TO_UI_ID_MAP = {
+        'bia_so_6': 'target-1',
+        'bia_so_5': 'target-2',
+        'bia_so_10': 'target-3',
+        'bia_so_7b': 'target-4',
+        // Bia 8c có 2 mục tiêu trên giao diện
+        'bia_so_8c': ['target-5', 'target-6'] 
+    };
+    let isLoadingResults = false;
     let isCalibrating = false;
     let capturedShots = [];
     let currentShotIndex = 0;
@@ -63,10 +79,14 @@ document.addEventListener('DOMContentLoaded', function() {
      * Kiểm tra trạng thái tổng thể và bật/tắt nút "Xuất phát".
      */
     function checkSystemReady() {
-        if (isSessionActive) {
-            // Nếu phiên đang diễn ra, nút Xuất phát LUÔN BỊ VÔ HIỆU HÓA
+        // **SỬA ĐỔI:** Thêm điều kiện `isLoadingResults`
+        if (isSessionActive || isLoadingResults) {
             startBtn.disabled = true;
-            startBtn.innerHTML = '<i class="fa-solid fa-hourglass-start me-2"></i>Đang bắn...';
+            if (isSessionActive) {
+                startBtn.innerHTML = '<i class="fa-solid fa-hourglass-start me-2"></i>Đang bắn...';
+            } else { // Tức là isLoadingResults = true
+                startBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Đang xử lý...';
+            }
         } else if (systemStatus.video && systemStatus.trigger) {
             // Nếu không có phiên nào và thiết bị sẵn sàng, KÍCH HOẠT nút
             startBtn.disabled = false;
@@ -171,41 +191,88 @@ document.addEventListener('DOMContentLoaded', function() {
         capturedShots.push(data.image_data);
     });
 
-    // **SỬA ĐỔI: Sự kiện kết thúc phiên**
+    // **THAY THẾ HOÀN TOÀN HÀM NÀY**
     socket.on('session_ended', function(data) {
-        console.log(`✅ Nhận lệnh kết thúc phiên. Lý do: ${data.reason}. Chờ đủ ${data.total_shots} ảnh.`);
+        console.log('✅ Nhận lệnh kết thúc phiên. Bắt đầu xử lý kết quả.');
         isSessionActive = false;
+        isLoadingResults = true;
         if (timerInterval) {
             clearInterval(timerInterval);
         }
-        
-        // Hàm kiểm tra và hiển thị modal
-        const checkAndShowModal = () => {
-            // Nếu số ảnh nhận được chưa đủ, chờ 100ms nữa rồi kiểm tra lại
+
+        // 1. Vô hiệu hóa nút Xuất phát và cập nhật trạng thái ngay lập tức
+        checkSystemReady();
+
+        // 2. Hiển thị Modal ở trạng thái "Loading" NGAY LẬP TỨC
+        modalLoadingState.style.display = 'block';
+        modalResultsContent.style.display = 'none';
+        sessionEndModal.show();
+
+        // 3. Bắt đầu quá trình kiểm tra ảnh nền và xử lý kết quả
+        const processResults = () => {
+            // Nếu ảnh chưa về đủ, chờ 100ms nữa rồi kiểm tra lại
             if (capturedShots.length < data.total_shots) {
-                setTimeout(checkAndShowModal, 100);
-                return; 
+                setTimeout(processResults, 100);
+                return;
             }
 
-            // Đã nhận đủ ảnh, tiến hành hiển thị modal
-            console.log(`Đã nhận đủ ${capturedShots.length} ảnh. Hiển thị modal.`);
+            // 4. Đã có đủ dữ liệu, cập nhật nội dung và chuyển view
+            console.log('Đã nhận đủ ảnh. Cập nhật nội dung modal.');
+
+            // Điền dữ liệu lý do kết thúc
             let reasonText = 'Phiên tập đã hoàn thành!';
             if (data.reason === 'Hết thời gian') reasonText = 'Bạn đã hết thời gian.';
             else if (data.reason === 'Hết đạn') reasonText = 'Bạn đã bắn hết đạn.';
             modalEndReasonEl.textContent = reasonText;
-            modalTotalShots.textContent = data.total_shots;
+
+            // Điền dữ liệu thống kê
+            modalHitCount.textContent = `${data.hit_count} / 6`;
+            modalAchievementBadge.textContent = data.achievement;
+
+            // Đổi màu huy hiệu thành tích
+            modalAchievementBadge.className = 'badge rounded-pill fs-6'; // Reset class
+            switch (data.achievement) {
+                case 'Giỏi': modalAchievementBadge.classList.add('bg-success'); break;
+                case 'Khá': modalAchievementBadge.classList.add('bg-primary'); break;
+                case 'Đạt': modalAchievementBadge.classList.add('bg-info'); break;
+                case 'Không đạt': modalAchievementBadge.classList.add('bg-danger'); break;
+                default: modalAchievementBadge.classList.add('bg-secondary');
+            }
+
+            // Cập nhật trình xem ảnh
             currentShotIndex = 0;
-            updateShotReviewUI(); 
+            updateShotReviewUI();
 
-            setTimeout(() => sessionEndModal.show(), 500);
+            // Chuyển từ loading sang hiển thị kết quả
+            modalLoadingState.style.display = 'none';
+            modalResultsContent.style.display = 'block';
 
-            startBtn.disabled = false;
-            // Cập nhật nút Xuất phát thành Bắn lại
-            startBtn.innerHTML = '<i class="fa-solid fa-redo me-2"></i>Bắn lại';
+            // 5. Đánh dấu đã xử lý xong và kích hoạt lại nút bấm
+            isLoadingResults = false;
+            checkSystemReady(); // Gọi lại để cập nhật nút Xuất phát -> Bắn lại
         };
 
-        // Bắt đầu quá trình kiểm tra
-        checkAndShowModal();
+        // Bắt đầu chạy hàm xử lý
+        processResults();
+    });
+
+    // **THÊM MỚI: Lắng nghe sự kiện khi có mục tiêu bị bắn trúng**
+    socket.on('ui_target_hit', function(data) {
+        const targetName = data.target_name;
+        console.log(`🎯 Giao diện nhận được thông báo trúng: ${targetName}`);
+
+        const uiIds = TARGET_NAME_TO_UI_ID_MAP[targetName];
+        if (!uiIds) return;
+
+        // Xử lý trường hợp bia 8c có 2 ID
+        const idsToUpdate = Array.isArray(uiIds) ? uiIds : [uiIds];
+
+        idsToUpdate.forEach(id => {
+            const targetEl = document.getElementById(id);
+            if (targetEl) {
+                targetEl.classList.add('hit'); // Thêm class .hit để đổi màu viền
+            }
+        });
     });
 
     function updateShotReviewUI() {
@@ -268,9 +335,20 @@ document.addEventListener('DOMContentLoaded', function() {
             
             sendCommand('start', true);
             isSessionActive = true;
+            // **THÊM MỚI: Reset trạng thái 'hit' của các mặt bia**
+            for (let i = 1; i <= 6; i++) {
+                const targetEl = document.getElementById(`target-${i}`);
+                if (targetEl) {
+                    targetEl.classList.remove('hit');
+                    targetEl.classList.remove('hit-completed');
+                }
+            }
             checkSystemReady();
             if (ammoCountElement) {
                 ammoCountElement.textContent = '16 / 16';
+            }
+            if (timerElement) {
+                timerElement.textContent = '01:27';
             }
             startSound.play();
             startBtn.disabled = true;
@@ -319,14 +397,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- LOGIC CHÍNH CỦA BÀI BẮN (GIỮ NGUYÊN CỦA BẠN) ---
     function runTargetSequence() {
-        let timeLeft = 75;
-        // SỬA ĐỔI: Gán vào biến timerInterval thay vì const countdown
+        // SỬA ĐỔI: Tổng thời gian là 87 giây
+        let timeLeft = 87;
+
         timerInterval = setInterval(() => {
             if (timeLeft < 0) {
                 clearInterval(timerInterval);
-                timesUpSound.play();
                 timerElement.textContent = '00:00';
-                // Xóa logic cũ ở đây vì đã có sự kiện session_ended xử lý
+                // Sự kiện session_ended từ server sẽ xử lý việc kết thúc
                 return;
             }
             
@@ -334,27 +412,34 @@ document.addEventListener('DOMContentLoaded', function() {
             let seconds = String(timeLeft % 60).padStart(2, '0');
             timerElement.textContent = `${minutes}:${seconds}`;
 
-            // Lấy các element của mặt bia
             const targetElements = {
                 t1: document.getElementById('target-1'), t2: document.getElementById('target-2'),
                 t3: document.getElementById('target-3'), t4: document.getElementById('target-4'),
                 t5: document.getElementById('target-5'), t6: document.getElementById('target-6')
             };
 
-            // Dòng thời gian hiện/ẩn bia và phát âm thanh
-            if (timeLeft === 60) { targetElements.t1.classList.add('flash'); targetSounds.bia6_hien.play(); }
-            if (timeLeft === 54) { targetElements.t1.classList.remove('flash'); targetElements.t1.classList.add('hit-completed'); targetSounds.bia6_an.play(); }
-            if (timeLeft === 51) { targetElements.t2.classList.add('flash'); targetSounds.bia5_hien.play(); }
-            if (timeLeft === 45) { targetElements.t2.classList.remove('flash'); targetElements.t2.classList.add('hit-completed'); targetSounds.bia5_an.play(); }
-            if (timeLeft === 35) { targetElements.t3.classList.add('flash'); targetSounds.bia10_hien.play(); }
-            if (timeLeft === 30) { targetElements.t3.classList.remove('flash'); targetElements.t3.classList.add('hit-completed'); targetSounds.bia10_an.play(); }
-            if (timeLeft === 27) { targetElements.t4.classList.add('flash'); targetSounds.bia7b_hien.play(); }
-            if (timeLeft === 22) { targetElements.t4.classList.remove('flash'); targetElements.t4.classList.add('hit-completed'); targetSounds.bia7b_an.play(); }
-            if (timeLeft === 7)  { targetElements.t5.classList.add('flash'); targetElements.t6.classList.add('flash'); targetSounds.bia8c_hien.play(); }
+            // Dòng thời gian MỚI cho bài bắn 87 giây
+            // Các bia cũ được điều chỉnh lại thời gian tương ứng
+            if (timeLeft === 72) { targetElements.t1.classList.add('flash'); targetSounds.bia6_hien.play(); } // Giây thứ 15
+            if (timeLeft === 66) { targetElements.t1.classList.remove('flash'); targetElements.t1.classList.add('hit-completed'); targetSounds.bia6_an.play(); }
+            
+            if (timeLeft === 63) { targetElements.t2.classList.add('flash'); targetSounds.bia5_hien.play(); } // Giây thứ 24
+            if (timeLeft === 57) { targetElements.t2.classList.remove('flash'); targetElements.t2.classList.add('hit-completed'); targetSounds.bia5_an.play(); }
+            
+            if (timeLeft === 47) { targetElements.t3.classList.add('flash'); targetSounds.bia10_hien.play(); } // Giây thứ 40
+            if (timeLeft === 42) { targetElements.t3.classList.remove('flash'); targetElements.t3.classList.add('hit-completed'); targetSounds.bia10_an.play(); }
+            
+            if (timeLeft === 39) { targetElements.t4.classList.add('flash'); targetSounds.bia7b_hien.play(); } // Giây thứ 48
+            if (timeLeft === 34) { targetElements.t4.classList.remove('flash'); targetElements.t4.classList.add('hit-completed'); targetSounds.bia7b_an.play(); }
+            
+            // KỊCH BẢN MỚI CHO BIA SỐ 8C
+            if (timeLeft === 19) { targetElements.t5.classList.add('flash'); targetSounds.bia8c_hien.play(); } // Giây thứ 68, bia 8c ngang hiện
+            if (timeLeft === 12) { targetElements.t6.classList.add('flash'); targetSounds.bia8c_hien.play(); } // Giây thứ 75, bia 8c chếch hiện
+            
+            if (timeLeft === 7)  { targetElements.t5.classList.remove('flash'); targetElements.t5.classList.add('hit-completed'); targetSounds.bia8c_an.play(); } // 8c ngang ẩn sau 12s
             if (timeLeft === 0)  { 
-                targetElements.t5.classList.remove('flash'); targetElements.t5.classList.add('hit-completed'); 
-                targetElements.t6.classList.remove('flash'); targetElements.t6.classList.add('hit-completed'); 
-                timesUpSound.play()
+                targetElements.t6.classList.remove('flash'); targetElements.t6.classList.add('hit-completed'); // 8c chếch ẩn sau 12s
+                timesUpSound.play();
             }
 
             timeLeft--;
