@@ -140,11 +140,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     socket.on('connect', () => console.log('✅ Giao diện đã kết nối SocketIO!'));
 
-    // **THAY ĐỔI DUY NHẤT TẠI ĐÂY**: Thêm trình xử lý nhận video
-    socket.on('video_frame_to_browser', function(data) {
-        videoFeed.src = 'data:image/jpeg;base64,' + data.image;
-    });
-
     socket.on('disconnect', () => {
         systemStatus.video = false;
         systemStatus.trigger = false;
@@ -160,20 +155,30 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // **SỬA ĐỔI: Thêm logic xử lý lỗi vào sự kiện status_updated**
     socket.on('status_updated', function(data) {
         const { component, status } = data;
         const isReady = (status === 'ready');
 
+        // **LOGIC MỚI: Nếu đang trong phiên tập mà có thiết bị mất kết nối**
         if (isSessionActive && !isReady) {
             const deviceName = (component === 'video') ? 'Camera' : 'Cò bắn';
             modalErrorMessageEl.textContent = `Mất kết nối với ${deviceName}. Phiên tập sẽ được hủy và khởi động lại.`;
             
+            // Hiển thị modal
             sessionErrorModal.show();
+
+            // Gửi lệnh reset về Pi để hủy phiên
             sendCommand('reset', true);
+            
+            // Dừng mọi timer đang chạy trên giao diện
             if (timerInterval) clearInterval(timerInterval);
+
+            // Dừng xử lý thêm để tránh cập nhật giao diện không cần thiết
             return; 
         }
 
+        // Logic cũ: Cập nhật trạng thái và nút bấm khi không trong phiên tập
         if (component === 'video') systemStatus.video = isReady;
         else if (component === 'trigger') systemStatus.trigger = isReady;
         
@@ -186,6 +191,7 @@ document.addEventListener('DOMContentLoaded', function() {
         capturedShots.push(data.image_data);
     });
 
+    // **THAY THẾ HOÀN TOÀN HÀM NÀY**
     socket.on('session_ended', function(data) {
         console.log('✅ Nhận lệnh kết thúc phiên. Bắt đầu xử lý kết quả.');
         isSessionActive = false;
@@ -194,29 +200,37 @@ document.addEventListener('DOMContentLoaded', function() {
             clearInterval(timerInterval);
         }
 
+        // 1. Vô hiệu hóa nút Xuất phát và cập nhật trạng thái ngay lập tức
         checkSystemReady();
 
+        // 2. Hiển thị Modal ở trạng thái "Loading" NGAY LẬP TỨC
         modalLoadingState.style.display = 'block';
         modalResultsContent.style.display = 'none';
         sessionEndModal.show();
 
+        // 3. Bắt đầu quá trình kiểm tra ảnh nền và xử lý kết quả
         const processResults = () => {
+            // Nếu ảnh chưa về đủ, chờ 100ms nữa rồi kiểm tra lại
             if (capturedShots.length < data.total_shots) {
                 setTimeout(processResults, 100);
                 return;
             }
 
+            // 4. Đã có đủ dữ liệu, cập nhật nội dung và chuyển view
             console.log('Đã nhận đủ ảnh. Cập nhật nội dung modal.');
 
+            // Điền dữ liệu lý do kết thúc
             let reasonText = 'Phiên tập đã hoàn thành!';
             if (data.reason === 'Hết thời gian') reasonText = 'Bạn đã hết thời gian.';
             else if (data.reason === 'Hết đạn') reasonText = 'Bạn đã bắn hết đạn.';
             modalEndReasonEl.textContent = reasonText;
 
+            // Điền dữ liệu thống kê
             modalHitCount.textContent = `${data.hit_count} / 6`;
             modalAchievementBadge.textContent = data.achievement;
 
-            modalAchievementBadge.className = 'badge rounded-pill fs-6';
+            // Đổi màu huy hiệu thành tích
+            modalAchievementBadge.className = 'badge rounded-pill fs-6'; // Reset class
             switch (data.achievement) {
                 case 'Giỏi': modalAchievementBadge.classList.add('bg-success'); break;
                 case 'Khá': modalAchievementBadge.classList.add('bg-primary'); break;
@@ -225,19 +239,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 default: modalAchievementBadge.classList.add('bg-secondary');
             }
 
+            // Cập nhật trình xem ảnh
             currentShotIndex = 0;
             updateShotReviewUI();
 
+            // Chuyển từ loading sang hiển thị kết quả
             modalLoadingState.style.display = 'none';
             modalResultsContent.style.display = 'block';
 
+            // 5. Đánh dấu đã xử lý xong và kích hoạt lại nút bấm
             isLoadingResults = false;
-            checkSystemReady();
+            checkSystemReady(); // Gọi lại để cập nhật nút Xuất phát -> Bắn lại
         };
 
+        // Bắt đầu chạy hàm xử lý
         processResults();
     });
 
+    // **THÊM MỚI: Lắng nghe sự kiện khi có mục tiêu bị bắn trúng**
     socket.on('ui_target_hit', function(data) {
         const targetName = data.target_name;
         console.log(`🎯 Giao diện nhận được thông báo trúng: ${targetName}`);
@@ -245,12 +264,13 @@ document.addEventListener('DOMContentLoaded', function() {
         const uiIds = TARGET_NAME_TO_UI_ID_MAP[targetName];
         if (!uiIds) return;
 
+        // Xử lý trường hợp bia 8c có 2 ID
         const idsToUpdate = Array.isArray(uiIds) ? uiIds : [uiIds];
 
         idsToUpdate.forEach(id => {
             const targetEl = document.getElementById(id);
             if (targetEl) {
-                targetEl.classList.add('hit');
+                targetEl.classList.add('hit'); // Thêm class .hit để đổi màu viền
             }
         });
     });
@@ -258,21 +278,23 @@ document.addEventListener('DOMContentLoaded', function() {
     function updateShotReviewUI() {
         const totalShots = capturedShots.length;
         if (totalShots === 0) {
-            shotReviewImage.style.display = 'none';
+            shotReviewImage.style.display = 'none'; // Ẩn khung ảnh
             shotCounter.textContent = 'Không có phát bắn nào';
             prevShotBtn.disabled = true;
             nextShotBtn.disabled = true;
             return;
         }
 
-        shotReviewImage.style.display = 'block';
+        shotReviewImage.style.display = 'block'; // Hiện khung ảnh
         shotReviewImage.src = capturedShots[currentShotIndex];
         shotCounter.textContent = `Ảnh ${currentShotIndex + 1} / ${totalShots}`;
 
+        // Bật/tắt nút "Trước", "Sau"
         prevShotBtn.disabled = (currentShotIndex === 0);
         nextShotBtn.disabled = (currentShotIndex >= totalShots - 1);
     }
 
+    // **THÊM MỚI: Gán sự kiện cho các nút điều khiển ảnh**
     if (prevShotBtn) {
         prevShotBtn.addEventListener('click', () => {
             if (currentShotIndex > 0) {
@@ -293,6 +315,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (modalResetButton) {
         modalResetButton.addEventListener('click', () => {
+            // Chỉ cần tải lại trang, vì lệnh reset đã được gửi đi khi modal hiện ra
             location.reload();
         });
     }
@@ -303,13 +326,16 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // --- CÁC SỰ KIỆN NÚT BẤM VÀ TƯƠNG TÁC ---
     if (startBtn) {
         startBtn.addEventListener('click', () => {
+            // Xóa ảnh của phiên cũ trước khi bắt đầu phiên mới
             capturedShots = [];
             currentShotIndex = 0;
             
             sendCommand('start', true);
             isSessionActive = true;
+            // **THÊM MỚI: Reset trạng thái 'hit' của các mặt bia**
             for (let i = 1; i <= 6; i++) {
                 const targetEl = document.getElementById(`target-${i}`);
                 if (targetEl) {
@@ -369,13 +395,16 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // --- LOGIC CHÍNH CỦA BÀI BẮN (GIỮ NGUYÊN CỦA BẠN) ---
     function runTargetSequence() {
+        // SỬA ĐỔI: Tổng thời gian là 87 giây
         let timeLeft = 87;
 
         timerInterval = setInterval(() => {
             if (timeLeft < 0) {
                 clearInterval(timerInterval);
                 timerElement.textContent = '00:00';
+                // Sự kiện session_ended từ server sẽ xử lý việc kết thúc
                 return;
             }
             
@@ -389,24 +418,27 @@ document.addEventListener('DOMContentLoaded', function() {
                 t5: document.getElementById('target-5'), t6: document.getElementById('target-6')
             };
 
-            if (timeLeft === 72) { targetElements.t1.classList.add('flash'); targetSounds.bia6_hien.play(); }
+            // Dòng thời gian MỚI cho bài bắn 87 giây
+            // Các bia cũ được điều chỉnh lại thời gian tương ứng
+            if (timeLeft === 72) { targetElements.t1.classList.add('flash'); targetSounds.bia6_hien.play(); } // Giây thứ 15
             if (timeLeft === 66) { targetElements.t1.classList.remove('flash'); targetElements.t1.classList.add('hit-completed'); targetSounds.bia6_an.play(); }
             
-            if (timeLeft === 63) { targetElements.t2.classList.add('flash'); targetSounds.bia5_hien.play(); }
+            if (timeLeft === 63) { targetElements.t2.classList.add('flash'); targetSounds.bia5_hien.play(); } // Giây thứ 24
             if (timeLeft === 57) { targetElements.t2.classList.remove('flash'); targetElements.t2.classList.add('hit-completed'); targetSounds.bia5_an.play(); }
             
-            if (timeLeft === 47) { targetElements.t3.classList.add('flash'); targetSounds.bia10_hien.play(); }
+            if (timeLeft === 47) { targetElements.t3.classList.add('flash'); targetSounds.bia10_hien.play(); } // Giây thứ 40
             if (timeLeft === 42) { targetElements.t3.classList.remove('flash'); targetElements.t3.classList.add('hit-completed'); targetSounds.bia10_an.play(); }
             
-            if (timeLeft === 39) { targetElements.t4.classList.add('flash'); targetSounds.bia7b_hien.play(); }
+            if (timeLeft === 39) { targetElements.t4.classList.add('flash'); targetSounds.bia7b_hien.play(); } // Giây thứ 48
             if (timeLeft === 34) { targetElements.t4.classList.remove('flash'); targetElements.t4.classList.add('hit-completed'); targetSounds.bia7b_an.play(); }
             
-            if (timeLeft === 19) { targetElements.t5.classList.add('flash'); targetSounds.bia8c_hien.play(); }
-            if (timeLeft === 12) { targetElements.t6.classList.add('flash'); targetSounds.bia8c_hien.play(); }
+            // KỊCH BẢN MỚI CHO BIA SỐ 8C
+            if (timeLeft === 19) { targetElements.t5.classList.add('flash'); targetSounds.bia8c_hien.play(); } // Giây thứ 68, bia 8c ngang hiện
+            if (timeLeft === 12) { targetElements.t6.classList.add('flash'); targetSounds.bia8c_hien.play(); } // Giây thứ 75, bia 8c chếch hiện
             
-            if (timeLeft === 7)  { targetElements.t5.classList.remove('flash'); targetElements.t5.classList.add('hit-completed'); targetSounds.bia8c_an.play(); }
+            if (timeLeft === 7)  { targetElements.t5.classList.remove('flash'); targetElements.t5.classList.add('hit-completed'); targetSounds.bia8c_an.play(); } // 8c ngang ẩn sau 12s
             if (timeLeft === 0)  { 
-                targetElements.t6.classList.remove('flash'); targetElements.t6.classList.add('hit-completed');
+                targetElements.t6.classList.remove('flash'); targetElements.t6.classList.add('hit-completed'); // 8c chếch ẩn sau 12s
                 timesUpSound.play();
             }
 
@@ -414,6 +446,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 1000);
     }
 
+    // --- HÀM KHỞI TẠO GIAO DIỆN BAN ĐẦU ---
     function createTargetPlaceholders() {
         const targets = [
             { img: '/static/images/targets/bia_so_6.png', name: 'Bia số 6' },
@@ -436,6 +469,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // --- CHẠY CÁC HÀM KHỞI TẠO ---
     checkSystemReady();
     createTargetPlaceholders();
 });
