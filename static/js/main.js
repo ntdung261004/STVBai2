@@ -227,6 +227,30 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Điền dữ liệu thống kê
             modalHitCount.textContent = `${data.hit_count} / 6`;
+            // **THÊM MỚI: Logic hiển thị danh sách mục tiêu trúng**
+            const modalHitList = document.getElementById('modal-hit-list');
+            modalHitList.innerHTML = ''; // Xóa danh sách cũ
+
+            // Tạo một map để chuyển tên AI sang tên hiển thị cho đẹp
+            const TARGET_DISPLAY_NAMES = {
+                'bia_so_6': 'Bia số 6',
+                'bia_so_5': 'Bia số 5',
+                'bia_so_10': 'Bia số 10',
+                'bia_so_7b': 'Bia số 7b',
+                'bia_so_8c': 'Bia số 8c'
+            };
+
+            if (data.hit_target_names && data.hit_target_names.length > 0) {
+                data.hit_target_names.forEach(targetName => {
+                    const displayName = TARGET_DISPLAY_NAMES[targetName] || targetName;
+                    const badge = document.createElement('span');
+                    badge.className = 'badge bg-success me-1'; // Dùng màu xanh cho đồng bộ
+                    badge.textContent = displayName;
+                    modalHitList.appendChild(badge);
+                });
+            } else {
+                modalHitList.textContent = 'Không trúng mục tiêu nào.';
+            }
             modalAchievementBadge.textContent = data.achievement;
 
             // Đổi màu huy hiệu thành tích
@@ -264,13 +288,14 @@ document.addEventListener('DOMContentLoaded', function() {
         const uiIds = TARGET_NAME_TO_UI_ID_MAP[targetName];
         if (!uiIds) return;
 
-        // Xử lý trường hợp bia 8c có 2 ID
         const idsToUpdate = Array.isArray(uiIds) ? uiIds : [uiIds];
 
         idsToUpdate.forEach(id => {
             const targetEl = document.getElementById(id);
             if (targetEl) {
-                targetEl.classList.add('hit'); // Thêm class .hit để đổi màu viền
+                // **SỬA ĐỔI QUAN TRỌNG:**
+                targetEl.classList.remove('flash'); // Dừng nhấp nháy ngay lập tức
+                targetEl.classList.add('hit');      // Chuyển sang màu xanh lá
             }
         });
     });
@@ -418,27 +443,34 @@ document.addEventListener('DOMContentLoaded', function() {
                 t5: document.getElementById('target-5'), t6: document.getElementById('target-6')
             };
 
-            // Dòng thời gian MỚI cho bài bắn 87 giây
-            // Các bia cũ được điều chỉnh lại thời gian tương ứng
-            if (timeLeft === 72) { targetElements.t1.classList.add('flash'); targetSounds.bia6_hien.play(); } // Giây thứ 15
-            if (timeLeft === 66) { targetElements.t1.classList.remove('flash'); targetElements.t1.classList.add('hit-completed'); targetSounds.bia6_an.play(); }
+            // **LOGIC ĐÃ ĐƯỢC NÂNG CẤP VỚI ĐIỀU KIỆN KIỂM TRA '.hit'**
+
+            // Bia số 6
+            if (timeLeft === 72 && !targetElements.t1.classList.contains('hit')) { targetElements.t1.classList.add('flash'); targetSounds.bia6_hien.play(); }
+            if (timeLeft === 66 && !targetElements.t1.classList.contains('hit')) { targetElements.t1.classList.remove('flash'); targetElements.t1.classList.add('hit-completed'); targetSounds.bia6_an.play(); }
             
-            if (timeLeft === 63) { targetElements.t2.classList.add('flash'); targetSounds.bia5_hien.play(); } // Giây thứ 24
-            if (timeLeft === 57) { targetElements.t2.classList.remove('flash'); targetElements.t2.classList.add('hit-completed'); targetSounds.bia5_an.play(); }
+            // Bia số 5
+            if (timeLeft === 63 && !targetElements.t2.classList.contains('hit')) { targetElements.t2.classList.add('flash'); targetSounds.bia5_hien.play(); }
+            if (timeLeft === 57 && !targetElements.t2.classList.contains('hit')) { targetElements.t2.classList.remove('flash'); targetElements.t2.classList.add('hit-completed'); targetSounds.bia5_an.play(); }
             
-            if (timeLeft === 47) { targetElements.t3.classList.add('flash'); targetSounds.bia10_hien.play(); } // Giây thứ 40
-            if (timeLeft === 42) { targetElements.t3.classList.remove('flash'); targetElements.t3.classList.add('hit-completed'); targetSounds.bia10_an.play(); }
+            // Bia số 10
+            if (timeLeft === 47 && !targetElements.t3.classList.contains('hit')) { targetElements.t3.classList.add('flash'); targetSounds.bia10_hien.play(); }
+            if (timeLeft === 42 && !targetElements.t3.classList.contains('hit')) { targetElements.t3.classList.remove('flash'); targetElements.t3.classList.add('hit-completed'); targetSounds.bia10_an.play(); }
             
-            if (timeLeft === 39) { targetElements.t4.classList.add('flash'); targetSounds.bia7b_hien.play(); } // Giây thứ 48
-            if (timeLeft === 34) { targetElements.t4.classList.remove('flash'); targetElements.t4.classList.add('hit-completed'); targetSounds.bia7b_an.play(); }
+            // Bia số 7b
+            if (timeLeft === 39 && !targetElements.t4.classList.contains('hit')) { targetElements.t4.classList.add('flash'); targetSounds.bia7b_hien.play(); }
+            if (timeLeft === 34 && !targetElements.t4.classList.contains('hit')) { targetElements.t4.classList.remove('flash'); targetElements.t4.classList.add('hit-completed'); targetSounds.bia7b_an.play(); }
             
-            // KỊCH BẢN MỚI CHO BIA SỐ 8C
-            if (timeLeft === 19) { targetElements.t5.classList.add('flash'); targetSounds.bia8c_hien.play(); } // Giây thứ 68, bia 8c ngang hiện
-            if (timeLeft === 12) { targetElements.t6.classList.add('flash'); targetSounds.bia8c_hien.play(); } // Giây thứ 75, bia 8c chếch hiện
+            // Bia số 8c
+            if (timeLeft === 19 && !targetElements.t5.classList.contains('hit')) { targetElements.t5.classList.add('flash'); targetSounds.bia8c_hien.play(); }
+            if (timeLeft === 12 && !targetElements.t6.classList.contains('hit')) { targetElements.t6.classList.add('flash'); targetSounds.bia8c_hien.play(); }
             
-            if (timeLeft === 7)  { targetElements.t5.classList.remove('flash'); targetElements.t5.classList.add('hit-completed'); targetSounds.bia8c_an.play(); } // 8c ngang ẩn sau 12s
+            if (timeLeft === 7 && !targetElements.t5.classList.contains('hit'))  { targetElements.t5.classList.remove('flash'); targetElements.t5.classList.add('hit-completed'); targetSounds.bia8c_an.play(); }
             if (timeLeft === 0)  { 
-                targetElements.t6.classList.remove('flash'); targetElements.t6.classList.add('hit-completed'); // 8c chếch ẩn sau 12s
+                if (!targetElements.t6.classList.contains('hit')) {
+                    targetElements.t6.classList.remove('flash'); 
+                    targetElements.t6.classList.add('hit-completed');
+                }
                 timesUpSound.play();
             }
 

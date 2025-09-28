@@ -39,9 +39,15 @@
                                     <div><i class="fa-solid fa-flag-checkered me-2 text-muted"></i><span class="fw-medium">Lý do kết thúc</span></div>
                                     <strong id="modal-end-reason">...</strong>
                                 </div>
-                                <div class="list-group-item d-flex justify-content-between align-items-center">
-                                    <div><i class="fa-solid fa-bullseye me-2 text-muted"></i><span class="fw-medium">Mục tiêu trúng</span></div>
-                                    <strong id="modal-hit-count" class="text-success fs-5">0 / 6</strong>
+                                <div class="list-group-item d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <i class="fa-solid fa-bullseye me-2 text-muted"></i>
+                                        <span class="fw-medium">Mục tiêu trúng</span>
+                                    </div>
+                                    <div class="text-end">
+                                        <strong id="modal-hit-count" class="text-success fs-5 mb-1 d-block">0 / 6</strong>
+                                        <div id="modal-hit-list" class="small"></div>
+                                    </div>
                                 </div>
                                 <div class="list-group-item d-flex justify-content-between align-items-center">
                                     <div><i class="fa-solid fa-trophy me-2 text-muted"></i><span class="fw-medium">Thành tích</span></div>
@@ -55,7 +61,7 @@
 
             <div class="modal-footer">
                 <button id="modal-reload-button" type="button" class="btn btn-primary w-100 fs-5 py-2">
-                    <i class="fa-solid fa-redo me-2"></i>Bắn lại từ đầu
+                    <i class="fa-solid fa-redo me-2"></i>Bắn lại
                 </button>
             </div>
         </div>
